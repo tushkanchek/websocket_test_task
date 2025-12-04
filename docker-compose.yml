@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    # Используйте REDIS_ADDR=redis:6379, так как 'redis' это имя сервиса
+    environment:
+      - REDIS_ADDR=redis:6379
+      - WS_STREAM_NAME=chat_stream
+      - WS_GROUP_NAME=chat_group
+    ports:
+      - "3000:3000"
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    # Опционально, для доступа к Redis извне
+    ports:
+      - "6379:6379"
