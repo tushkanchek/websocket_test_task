@@ -1,0 +1,27 @@
+# Зависимости Go
+vendor/
+
+# Скомпилированные бинарники (исполняемые файлы)
+*.exe
+*.dll
+*.so
+*.o
+*.a
+app
+
+# Log files
+*.log
+
+# IDE files (VSCode, JetBrains)
+.vscode/
+.idea/
+
+# Секретные файлы окружения
+.env 
+
+# Docker / Kubernetes
+# Удаляем файлы, созданные docker compose
+*.pem
+*.key
+!docker-compose.yaml
+!docker-compose.yml

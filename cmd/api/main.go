@@ -1,11 +1,11 @@
 package main
 
 import (
+	"go-ws-chat/internal/config" // 
 	"go-ws-chat/internal/handler"
 	"go-ws-chat/internal/infra"
 	"go-ws-chat/internal/service"
 	"log"
-	"os"
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
@@ -13,38 +13,27 @@ import (
 )
 
 func main() {
-	// Получаем переменные окружения
-	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" {
-		redisAddr = "redis:6379"
-	}
-	streamName := os.Getenv("WS_STREAM_NAME")
-	if streamName == "" {
-		streamName = "chat_stream"
-	}
-	groupName := os.Getenv("WS_GROUP_NAME")
-	if groupName == "" {
-		groupName = "chat_group"
-	}
+	// 1. Загрузка конфигурации
+	cfg := config.LoadConfig() //
 
-	// 1. Инициализация инфраструктуры (Redis Broker)
-	broker := infra.NewRedisBroker(redisAddr, streamName, groupName)
+	// 2. Инициализация инфраструктуры
+	broker := infra.NewRedisBroker(cfg.RedisAddr, cfg.WSStream, cfg.WSGroup)
 	
-	// 2. Инициализация сервисного слоя (Hub), внедрение брокера
+	// 3. Инициализация сервисного слоя
 	hub := service.NewHub(broker)
 	
-	// 3. Инициализация транспортного слоя (Handler), внедрение Hub
+	// 4. Инициализация транспортного слоя
 	wsHandler := handler.NewWSHandler(hub)
 
-	// 4. Настройка Fiber
+	// 5. Настройка Fiber
 	app := fiber.New()
 	app.Use(logger.New())
 
 	// Роуты
 	app.Use("/ws", wsHandler.UpgradeMiddleware)
-	app.Get("/ws", websocket.New(wsHandler.HandleWebSocket))	
+	app.Get("/ws", websocket.New(wsHandler.HandleWebSocket))
 
-	// 5. Запуск сервера
-	log.Println("Starting Server on :3000")
-	log.Fatal(app.Listen(":3000"))
+	// 6. Запуск сервера с использованием порта из конфига
+	log.Printf("Starting Server on :%s", cfg.AppPort)
+	log.Fatal(app.Listen(":" + cfg.AppPort))
 }
