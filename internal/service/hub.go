@@ -5,7 +5,7 @@ import (
 	"github.com/gofiber/contrib/websocket"
 	"go-ws-chat/internal/entity"
 	"go-ws-chat/internal/infra"
-	"log"
+	"log/slog"
 	"sync"
 )
 
@@ -33,7 +33,7 @@ func (h *Hub) Register(userID string, conn *websocket.Conn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.clients[userID] = conn
-	log.Printf("[HUB] User %s connected", userID)
+	slog.Info("User connected", "component", "hub", "user_id", userID)
 }
 
 // Unregister удаляет соединение
@@ -42,11 +42,11 @@ func (h *Hub) Unregister(userID string) {
 	defer h.mu.Unlock()
 	if _, ok := h.clients[userID]; ok {
 		delete(h.clients, userID)
-		log.Printf("[HUB] User %s disconnected", userID)
+		slog.Info("User disconnected", "component", "hub", "user_id", userID)
 	}
 }
 
-// Broadcast принимает контекст из Handler и передает его дальше
+// Broadcast публикует сообщение в очередь, используя контекст таймаута
 func (h *Hub) Broadcast(ctx context.Context, msg entity.Message) error {
 	return h.broker.Publish(ctx, msg)
 }
@@ -66,7 +66,7 @@ func (h *Hub) deliverToUser(msg entity.Message) {
 
 	if ok {
 		if err := client.WriteJSON(msg); err != nil {
-			log.Printf("[HUB] Error writing to client %s: %v. Closing connection.", msg.ToID, err)
+			slog.Error("Error writing to client", "user_id", msg.ToID, "error", err)
 			client.Close()
 			h.Unregister(msg.ToID)
 		}

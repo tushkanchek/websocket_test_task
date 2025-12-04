@@ -1,15 +1,13 @@
 package main
-
 import (
 	"context"
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
 	"go-ws-chat/internal/config"
 	"go-ws-chat/internal/handler"
 	"go-ws-chat/internal/infra"
 	"go-ws-chat/internal/service"
-	"log"
+	"log/slog" // Структурированное логирование
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,13 +15,17 @@ import (
 )
 
 func main() {
+	// Настройка структурированного логгирования (JSON)
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
 	// 1. Загрузка конфигурации
 	cfg := config.LoadConfig() 
     
-    // 2. Создаем контекст для Graceful Shutdown (управления Consumer)
+    // 2. Создаем контекст для Graceful Shutdown
     ctx, cancel := context.WithCancel(context.Background()) 
 
-	// 3. Инициализация инфраструктуры и сервисов (Dependency Injection)
+	// 3. Инициализация инфраструктуры и сервисов
 	broker := infra.NewRedisBroker(cfg.RedisAddr, cfg.WSStream, cfg.WSGroup)
 	// Передаем контекст Hub, чтобы он запустил Consumer с возможностью отмены
 	hub := service.NewHub(broker, ctx) 
@@ -31,17 +33,20 @@ func main() {
 
 	// 4. Настройка Fiber
 	app := fiber.New()
-	app.Use(logger.New())
+
+	// Healthcheck для мониторинга
+	app.Get("/health", func(c *fiber.Ctx) error {
+	    return c.JSON(fiber.Map{"status": "ok"})
+	})
 
 	app.Use("/ws", wsHandler.UpgradeMiddleware)
-	// Обертка websocket.New() устраняет ошибку несовместимости типов
 	app.Get("/ws", websocket.New(wsHandler.HandleWebSocket)) 
 
 	// 5. Запуск сервера в отдельной горутине
 	go func() {
-		log.Printf("Starting Fiber Server on :%s", cfg.AppPort)
+		slog.Info("Starting Fiber Server", "port", cfg.AppPort)
 		if err := app.Listen(":" + cfg.AppPort); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Fiber server error: %v", err)
+			slog.Error("Fiber server error", "error", err)
 		}
 	}()
     
@@ -49,24 +54,24 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM) 
     
-	<-quit // Блокируем до получения сигнала
-	log.Println("--- Received shutdown signal. Starting graceful shutdown. ---")
+	<-quit 
+	slog.Info("Received shutdown signal. Starting graceful shutdown.")
 
-	// a) Отменяем контекст, останавливая потребительские горутины
+	// a) Отменяем контекст, останавливая Consumer
 	cancel() 
-	log.Println("1. Graceful shutdown: Context cancelled for consumers.")
+	slog.Info("1. Graceful shutdown: Context cancelled for consumers.")
     
 	// b) Корректно закрываем Fiber
 	if err := app.Shutdown(); err != nil {
-		log.Fatalf("Fiber Shutdown Error: %v", err)
+		slog.Error("Fiber Shutdown Error", "error", err)
 	}
-	log.Println("2. Graceful shutdown: HTTP/WS server stopped.")
+	slog.Info("2. Graceful shutdown: HTTP/WS server stopped.")
     
 	// c) Закрываем соединение с Redis
 	if err := broker.Close(); err != nil {
-	    log.Printf("Error closing Redis connection: %v", err)
+	    slog.Error("Error closing Redis connection", "error", err)
 	}
-	log.Println("3. Graceful shutdown: Redis connection closed.")
+	slog.Info("3. Graceful shutdown: Redis connection closed.")
 
-	log.Println("Application gracefully stopped.")
+	slog.Info("Application gracefully stopped.")
 }

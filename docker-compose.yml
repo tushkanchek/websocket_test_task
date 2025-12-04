@@ -2,20 +2,18 @@ version: '3.8'
 services:
   app:
     build: .
-    # Go приложение берет конфиги автоматически из окружения контейнера,
-    # которое Docker Compose заполняет из файла .env
+    # Docker Compose автоматически подгрузит переменные из .env
     ports:
-      - "${APP_PORT}:${APP_PORT}" # 3000:3000
+      - "${APP_PORT}:${APP_PORT}"
     depends_on:
       - redis
 
   redis:
     image: redis:7-alpine
     ports:
-      # Слева (Host) - берем из переменной. Справа (Container) - стандартный порт Redis.
+      # ${REDIS_PORT} - внешний порт, 6379 - внутренний порт контейнера Redis
       - "${REDIS_PORT}:6379" 
     volumes:
-      # (Опционально) Чтобы не терять данные при перезапуске контейнера
       - redis_data:/data
 
 volumes:

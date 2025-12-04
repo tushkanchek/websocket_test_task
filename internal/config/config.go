@@ -1,7 +1,7 @@
 package config
 
 import (
-	"log"
+	"log/slog"
 	"os"
 )
 
@@ -13,8 +13,7 @@ type Config struct {
 	WSGroup     string
 }
 
-// LoadConfig инициализирует и возвращает конфигурацию, 
-// загружая значения из переменных окружения.
+// LoadConfig инициализирует и возвращает конфигурацию.
 func LoadConfig() *Config {
 	cfg := &Config{
 		AppPort:     os.Getenv("APP_PORT"),
@@ -23,7 +22,6 @@ func LoadConfig() *Config {
 		WSGroup:     os.Getenv("WS_GROUP_NAME"),
 	}
 
-	// Установка значений по умолчанию
 	if cfg.AppPort == "" {
 		cfg.AppPort = "3000"
 	}
@@ -37,6 +35,6 @@ func LoadConfig() *Config {
 		cfg.WSGroup = "chat_group"
 	}
 
-	log.Printf("Loaded Config: Port=%s, Redis=%s, Stream=%s", cfg.AppPort, cfg.RedisAddr, cfg.WSStream)
+	slog.Info("Configuration loaded", "port", cfg.AppPort, "redis_addr", cfg.RedisAddr, "stream", cfg.WSStream)
 	return cfg
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go-ws-chat/internal/entity"
 	"go-ws-chat/internal/service"
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -32,31 +32,29 @@ func (h *WSHandler) HandleWebSocket(c *websocket.Conn) {
 	if userID == "" {
 		c.WriteJSON(fiber.Map{"error": "Unauthorized: token required"})
 		c.Close()
-		log.Println("[Handler] Connection rejected: No token")
+		slog.Warn("Connection rejected: No token", "component", "ws_handler")
 		return
 	}
 
 	h.hub.Register(userID, c)
 	defer h.hub.Unregister(userID)
 
-	// Цикл чтения сообщений от клиента
 	for {
 		var msg entity.Message
 		if err := c.ReadJSON(&msg); err != nil {
-			log.Printf("[Handler] Read error for %s: %v", userID, err)
+			slog.Info("Client read error, closing connection", "user_id", userID, "error", err)
 			break 
 		}
 
 		msg.FromID = userID
 		msg.Timestamp = time.Now().Unix()
 
-		// Публикация в очередь с тайм-аутом (Крутое использование контекста)
-		// Если Redis не ответит за 5 секунд, операция прервется.
+		// Публикация в очередь с таймаутом (5 секунд)
 		publishCtx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
 		
 		if err := h.hub.Broadcast(publishCtx, msg); err != nil {
-			log.Printf("[Handler] Failed to publish message (Error: %v)", err)
+			slog.Error("Failed to publish message", "error", err, "user_id", userID)
 		}
-		cancel() 
+		cancel() // Освобождаем ресурсы контекста
 	}
 }

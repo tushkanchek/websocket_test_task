@@ -3,13 +3,16 @@ package infra
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 	"go-ws-chat/internal/entity"
 )
+
+
+//go:generate go run go.uber.org/mock/mockgen -source=redis_broker.go -destination=mocks/mock_broker.go -package=mocks
 
 // Broker — интерфейс для работы с очередью.
 type Broker interface {
@@ -60,7 +63,7 @@ func (r *RedisBroker) Consume(ctx context.Context, onMessage func(msg entity.Mes
 		// Проверяем контекст на отмену (Graceful Shutdown)
 		select {
 		case <-ctx.Done():
-			log.Println("[Redis Consumer] Context cancelled. Stopping consumer loop.")
+			slog.Info("Context cancelled. Stopping consumer loop.", "component", "redis_consumer")
 			return 
 		default:
 		}
@@ -75,7 +78,7 @@ func (r *RedisBroker) Consume(ctx context.Context, onMessage func(msg entity.Mes
 		}).Result()
 
 		if err != nil && err != redis.Nil {
-			log.Printf("[Redis Consumer] Error reading: %v", err)
+			slog.Error("Error reading from Redis", "error", err, "component", "redis_consumer")
 			time.Sleep(time.Second) 
 			continue
 		}
@@ -85,7 +88,7 @@ func (r *RedisBroker) Consume(ctx context.Context, onMessage func(msg entity.Mes
 				var message entity.Message
 				msgStr := msg.Values["data"].(string)
 				if err := json.Unmarshal([]byte(msgStr), &message); err != nil {
-					log.Printf("[Redis Consumer] Unmarshal error: %v", err)
+					slog.Error("Unmarshal error", "error", err, "component", "redis_consumer")
 					continue
 				}
 
@@ -99,6 +102,6 @@ func (r *RedisBroker) Consume(ctx context.Context, onMessage func(msg entity.Mes
 
 // Close закрывает соединение с Redis.
 func (r *RedisBroker) Close() error {
-    log.Println("[Redis Broker] Closing Redis client connection.")
+    slog.Info("Closing Redis client connection.", "component", "redis_broker")
     return r.client.Close()
 }
