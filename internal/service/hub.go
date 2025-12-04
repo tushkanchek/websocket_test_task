@@ -72,3 +72,23 @@ func (h *Hub) deliverToUser(msg entity.Message) {
 		}
 	}
 }
+
+// GetClientCount возвращает текущее количество активных клиентов.
+// Он безопасно считывает состояние мапы под Read Lock.
+func (h *Hub) GetClientCount() int {
+	h.mu.RLock() // Используем Read Lock для безопасного чтения
+	defer h.mu.RUnlock()
+	return len(h.clients)
+}
+
+// GetClientIDs возвращает список всех зарегистрированных ID (для более полного тестирования)
+func (h *Hub) GetClientIDs() []string {
+	h.mu.RLock() 
+	defer h.mu.RUnlock()
+	
+	ids := make([]string, 0, len(h.clients))
+	for id := range h.clients {
+		ids = append(ids, id)
+	}
+	return ids
+}

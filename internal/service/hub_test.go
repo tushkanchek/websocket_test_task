@@ -6,7 +6,9 @@ import (
 
 	"go-ws-chat/internal/entity"
 	mocks "go-ws-chat/internal/infra/mocks"
-	"go.uber.org/mock/gomock" 
+
+
+	"go.uber.org/mock/gomock"
 )
 
 func TestHub_Broadcast_Success(t *testing.T) {
@@ -69,3 +71,20 @@ func TestHub_Broadcast_BrokerFailure(t *testing.T) {
 		t.Error("Hub.Broadcast failed: expected an error due to broker failure, got nil")
 	}
 }
+
+
+func TestHub_Unregister_NonExistentUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockBroker := mocks.NewMockBroker(ctrl)
+	hub := NewHub(mockBroker, context.Background())
+
+	hub.Unregister("ghost_user")
+
+	if len(hub.clients) != 0 {
+		t.Error("Map should be empty")
+	}
+}
+
+
