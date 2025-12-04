@@ -9,21 +9,22 @@ import (
 	"sync"
 )
 
-// Hub управляет активными WebSocket соединениями и маршрутизацией
+// Hub управляет соединениями
 type Hub struct {
-	clients map[string]*websocket.Conn // Map: UserID -> Conn
-	mu      sync.RWMutex               // Защита map от конкурентного доступа
+	clients map[string]*websocket.Conn
+	mu      sync.RWMutex
 	broker  infra.Broker
 }
 
-func NewHub(broker infra.Broker) *Hub {
+// NewHub принимает контекст Graceful Shutdown
+func NewHub(broker infra.Broker, ctx context.Context) *Hub {
 	h := &Hub{
 		clients: make(map[string]*websocket.Conn),
 		broker:  broker,
 	}
 	
-	// Запускаем Consumer в отдельной горутине при старте Хаба
-	go h.startConsumer()
+	// Запускаем Consumer, используя контекст, который будет отменен в main.go
+	go h.startConsumer(ctx)
 	return h
 }
 
@@ -45,15 +46,14 @@ func (h *Hub) Unregister(userID string) {
 	}
 }
 
-// Broadcast отправляет сообщение в очередь (Publish)
+// Broadcast принимает контекст из Handler и передает его дальше
 func (h *Hub) Broadcast(ctx context.Context, msg entity.Message) error {
 	return h.broker.Publish(ctx, msg)
 }
 
-// startConsumer слушает очередь и доставляет сообщения локальным клиентам
-func (h *Hub) startConsumer() {
-	// Бесконечный цикл чтения из очереди, запущенный в горутине
-	h.broker.Consume(context.Background(), func(msg entity.Message) {
+// startConsumer слушает очередь, используя переданный контекст для остановки
+func (h *Hub) startConsumer(ctx context.Context) {
+	h.broker.Consume(ctx, func(msg entity.Message) {
 		h.deliverToUser(msg)
 	})
 }
@@ -71,5 +71,4 @@ func (h *Hub) deliverToUser(msg entity.Message) {
 			h.Unregister(msg.ToID)
 		}
 	}
-	// Если пользователя нет, то он либо оффлайн, либо подключен к другому инстансу
 }

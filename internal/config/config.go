@@ -23,12 +23,11 @@ func LoadConfig() *Config {
 		WSGroup:     os.Getenv("WS_GROUP_NAME"),
 	}
 
-	// Установка значений по умолчанию, если они не заданы
+	// Установка значений по умолчанию
 	if cfg.AppPort == "" {
 		cfg.AppPort = "3000"
 	}
 	if cfg.RedisAddr == "" {
-		// Используем имя сервиса из docker-compose
 		cfg.RedisAddr = "redis:6379" 
 	}
 	if cfg.WSStream == "" {

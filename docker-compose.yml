@@ -2,18 +2,21 @@ version: '3.8'
 services:
   app:
     build: .
-    # Используйте REDIS_ADDR=redis:6379, так как 'redis' это имя сервиса
-    environment:
-      - REDIS_ADDR=redis:6379
-      - WS_STREAM_NAME=chat_stream
-      - WS_GROUP_NAME=chat_group
+    # Go приложение берет конфиги автоматически из окружения контейнера,
+    # которое Docker Compose заполняет из файла .env
     ports:
-      - "3000:3000"
+      - "${APP_PORT}:${APP_PORT}" # 3000:3000
     depends_on:
       - redis
 
   redis:
     image: redis:7-alpine
-    # Опционально, для доступа к Redis извне
     ports:
-      - "6379:6379"
+      # Слева (Host) - берем из переменной. Справа (Container) - стандартный порт Redis.
+      - "${REDIS_PORT}:6379" 
+    volumes:
+      # (Опционально) Чтобы не терять данные при перезапуске контейнера
+      - redis_data:/data
+
+volumes:
+  redis_data:

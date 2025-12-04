@@ -3,17 +3,19 @@ package infra
 import (
 	"context"
 	"encoding/json"
-	"github.com/redis/go-redis/v9"
-	"go-ws-chat/internal/entity"
 	"log"
 	"os"
 	"time"
+
+	"github.com/redis/go-redis/v9"
+	"go-ws-chat/internal/entity"
 )
 
-// Broker — интерфейс для работы с очередью
+// Broker — интерфейс для работы с очередью.
 type Broker interface {
 	Publish(ctx context.Context, msg entity.Message) error
 	Consume(ctx context.Context, handler func(msg entity.Message))
+	Close() error
 }
 
 type RedisBroker struct {
@@ -26,8 +28,6 @@ func NewRedisBroker(addr, stream, group string) *RedisBroker {
 	rdb := redis.NewClient(&redis.Options{Addr: addr})
 	
 	ctx := context.Background()
-	// Создаем группу потребителей. `MkStream` создает поток, если он не существует.
-	// Ошибку игнорируем, если группа уже есть.
 	_ = rdb.XGroupCreateMkStream(ctx, stream, group, "$").Err()
 
 	return &RedisBroker{
@@ -37,34 +37,41 @@ func NewRedisBroker(addr, stream, group string) *RedisBroker {
 	}
 }
 
-// Publish публикует сообщение в Redis Stream
+// Publish использует переданный контекст для управления I/O.
 func (r *RedisBroker) Publish(ctx context.Context, msg entity.Message) error {
 	data, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
-
 	return r.client.XAdd(ctx, &redis.XAddArgs{
 		Stream: r.stream,
 		Values: map[string]interface{}{"data": data},
 	}).Err()
 }
 
-// Consume читает сообщения из потока в бесконечном цикле
+// Consume использует контекст для завершения работы.
 func (r *RedisBroker) Consume(ctx context.Context, onMessage func(msg entity.Message)) {
-	// Имя воркера должно быть уникальным для каждого запущенного инстанса
 	consumerName := os.Getenv("HOSTNAME") 
 	if consumerName == "" {
 		consumerName = "worker-default"
 	}
 	
 	for {
-		entries, err := r.client.XReadGroup(ctx, &redis.XReadGroupArgs{
+		// Проверяем контекст на отмену (Graceful Shutdown)
+		select {
+		case <-ctx.Done():
+			log.Println("[Redis Consumer] Context cancelled. Stopping consumer loop.")
+			return 
+		default:
+		}
+		
+		// Блокировка на 5 секунд, чтобы горутина могла проверить ctx.Done()
+		entries, err := r.client.XReadGroup(ctx, &redis.XReadGroupArgs{ 
 			Group:    r.group,
 			Consumer: consumerName, 
-			Streams:  []string{r.stream, ">"}, // Читаем новые (>) сообщения
+			Streams:  []string{r.stream, ">"},
 			Count:    10,
-			Block:    time.Second * 5, // Блокировка на 5 секунд
+			Block:    time.Second * 5, 
 		}).Result()
 
 		if err != nil && err != redis.Nil {
@@ -84,9 +91,14 @@ func (r *RedisBroker) Consume(ctx context.Context, onMessage func(msg entity.Mes
 
 				onMessage(message)
 				
-				// Подтверждение успешной обработки
 				r.client.XAck(ctx, r.stream, r.group, msg.ID)
 			}
 		}
 	}
+}
+
+// Close закрывает соединение с Redis.
+func (r *RedisBroker) Close() error {
+    log.Println("[Redis Broker] Closing Redis client connection.")
+    return r.client.Close()
 }
