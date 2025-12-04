@@ -58,3 +58,6 @@ func (h *WSHandler) HandleWebSocket(c *websocket.Conn) {
 		cancel() // Освобождаем ресурсы контекста
 	}
 }
+
+
+

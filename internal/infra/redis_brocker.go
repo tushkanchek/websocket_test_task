@@ -19,6 +19,7 @@ type Broker interface {
 	Publish(ctx context.Context, msg entity.Message) error
 	Consume(ctx context.Context, handler func(msg entity.Message))
 	Close() error
+	Ping(ctx context.Context) error
 }
 
 type RedisBroker struct {
@@ -104,4 +105,9 @@ func (r *RedisBroker) Consume(ctx context.Context, onMessage func(msg entity.Mes
 func (r *RedisBroker) Close() error {
     slog.Info("Closing Redis client connection.", "component", "redis_broker")
     return r.client.Close()
+}
+
+// Ping проверяет соединение с Redis.
+func (r *RedisBroker) Ping(ctx context.Context) error {
+	return r.client.Ping(ctx).Err()
 }
