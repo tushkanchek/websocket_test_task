@@ -16,6 +16,27 @@ import (
 	"time" // Импорт для таймаута Health Check
 )
 
+
+
+func main() {
+	// Настройка логгирования
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
+	// 1. Загрузка конфигурации и контекста
+	cfg := config.LoadConfig() 
+	ctx, cancel := context.WithCancel(context.Background()) 
+
+	// 2. Инициализация всех зависимостей и Fiber
+	app, broker, _ := setupDependencies(cfg, ctx, logger)
+
+	// 3. Запуск сервера и ожидание сигналов завершения
+	runServer(app, cfg, broker, cancel, logger)
+}
+
+
+
+
 // HealthCheckHandler возвращает обработчик Fiber, который проверяет доступность Broker (Redis).
 func HealthCheckHandler(broker infra.Broker, logger *slog.Logger) fiber.Handler {
 	return func(c *fiber.Ctx) error {
@@ -111,18 +132,3 @@ func runServer(app *fiber.App, cfg *config.Config, broker infra.Broker, cancel c
 }
 
 
-func main() {
-	// Настройка логгирования
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	slog.SetDefault(logger)
-
-	// 1. Загрузка конфигурации и контекста
-	cfg := config.LoadConfig() 
-	ctx, cancel := context.WithCancel(context.Background()) 
-
-	// 2. Инициализация всех зависимостей и Fiber
-	app, broker, _ := setupDependencies(cfg, ctx, logger)
-
-	// 3. Запуск сервера и ожидание сигналов завершения
-	runServer(app, cfg, broker, cancel, logger)
-}
