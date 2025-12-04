@@ -1,0 +1,40 @@
+package config
+
+import (
+	"log/slog"
+	"os"
+)
+
+// Config содержит все настройки приложения.
+type Config struct {
+	AppPort     string
+	RedisAddr   string
+	WSStream    string
+	WSGroup     string
+}
+
+// LoadConfig инициализирует и возвращает конфигурацию.
+func LoadConfig() *Config {
+	cfg := &Config{
+		AppPort:     os.Getenv("APP_PORT"),
+		RedisAddr:   os.Getenv("REDIS_ADDR"),
+		WSStream:    os.Getenv("WS_STREAM_NAME"),
+		WSGroup:     os.Getenv("WS_GROUP_NAME"),
+	}
+
+	if cfg.AppPort == "" {
+		cfg.AppPort = "3000"
+	}
+	if cfg.RedisAddr == "" {
+		cfg.RedisAddr = "redis:6379" 
+	}
+	if cfg.WSStream == "" {
+		cfg.WSStream = "chat_stream"
+	}
+	if cfg.WSGroup == "" {
+		cfg.WSGroup = "chat_group"
+	}
+
+	slog.Info("Configuration loaded", "port", cfg.AppPort, "redis_addr", cfg.RedisAddr, "stream", cfg.WSStream)
+	return cfg
+}

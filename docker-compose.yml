@@ -1,0 +1,20 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    # Docker Compose автоматически подгрузит переменные из .env
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      # ${REDIS_PORT} - внешний порт, 6379 - внутренний порт контейнера Redis
+      - "${REDIS_PORT}:6379" 
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:

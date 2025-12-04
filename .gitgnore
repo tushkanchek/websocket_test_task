@@ -1,0 +1,6 @@
+vendor/
+app
+*.log
+.env 
+.vscode/
+.idea/
